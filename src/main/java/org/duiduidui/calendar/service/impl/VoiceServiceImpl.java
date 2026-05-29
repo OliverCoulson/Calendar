@@ -1,6 +1,9 @@
-package org.duiduidui.calendar.service;
+package org.duiduidui.calendar.service.impl;
 
 import org.duiduidui.calendar.model.VoiceException;
+import org.duiduidui.calendar.service.RecognitionListener;
+import org.duiduidui.calendar.service.RecordingListener;
+import org.duiduidui.calendar.service.VoiceService;
 import org.duiduidui.calendar.voice.AudioRecorder;
 import org.duiduidui.calendar.voice.TtsPlayer;
 import org.duiduidui.calendar.voice.aliyun.AliyunASRClient;
@@ -76,14 +79,10 @@ public class VoiceServiceImpl implements VoiceService {
     }
 
     @Override
-    public boolean isListening() {
-        return false; // AudioRecorder 当前为同步阻塞模式
-    }
+    public boolean isListening() { return false; }
 
     @Override
-    public boolean isSpeaking() {
-        return TtsPlayer.isPlaying();
-    }
+    public boolean isSpeaking() { return TtsPlayer.isPlaying(); }
 
     @Override
     public void addRecordingListener(RecordingListener listener) {
