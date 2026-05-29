@@ -25,6 +25,10 @@ public class VoiceServiceImpl implements VoiceService {
         this.asrClient = new AliyunASRClient(appKey, accessKeyId, accessKeySecret);
     }
 
+    public VoiceServiceImpl(String appKey, String accessKeyId, String accessKeySecret, String gateway) {
+        this.asrClient = new AliyunASRClient(appKey, accessKeyId, accessKeySecret, gateway);
+    }
+
     @Override
     public String startListening() throws VoiceException {
         recordingListeners.forEach(RecordingListener::onRecordingStart);

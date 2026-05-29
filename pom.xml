@@ -64,6 +64,13 @@
             <version>${orgjson.version}</version>
         </dependency>
 
+        <!-- 阿里云 SDK（用于 Token 获取） -->
+        <dependency>
+            <groupId>com.aliyun</groupId>
+            <artifactId>aliyun-java-sdk-core</artifactId>
+            <version>4.7.1</version>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

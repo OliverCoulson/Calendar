@@ -2,24 +2,38 @@ package org.duiduidui.calendar.controller;
 
 import javafx.application.Platform;
 import javafx.scene.control.Label;
+import org.duiduidui.calendar.config.AppConfig;
 import org.duiduidui.calendar.model.VoiceException;
-import org.duiduidui.calendar.service.MockVoiceService;
-import org.duiduidui.calendar.service.RecognitionListener;
-import org.duiduidui.calendar.service.RecordingListener;
-import org.duiduidui.calendar.service.VoiceService;
+import org.duiduidui.calendar.service.*;
 
 /**
  * 主界面控制器 — 处理语音按钮点击、界面更新。
+ * 自动根据配置选择 MockVoiceService 或 VoiceServiceImpl。
  */
 public class MainController {
 
-    private final VoiceService voiceService = new MockVoiceService();
+    private final VoiceService voiceService;
 
     private Label statusLabel;
     private Label recognizedTextLabel;
     private Label responseLabel;
 
     public MainController() {
+        AppConfig config = new AppConfig();
+        String appKey = config.getAliyunAppKey();
+        String accessKeyId = config.getAliyunAccessKeyId();
+        String accessKeySecret = config.getAliyunAccessKeySecret();
+
+        if (appKey != null && !appKey.isEmpty()
+                && accessKeyId != null && !accessKeyId.isEmpty()
+                && accessKeySecret != null && !accessKeySecret.isEmpty()) {
+            voiceService = new VoiceServiceImpl(appKey, accessKeyId, accessKeySecret, config.getAliyunGateway());
+            System.out.println("[MainController] 使用阿里云语音服务");
+        } else {
+            voiceService = new MockVoiceService();
+            System.out.println("[MainController] 使用模拟语音服务（未配置阿里云 Key）");
+        }
+
         voiceService.addRecordingListener(new RecordingListener() {
             @Override public void onRecordingStart() {
                 Platform.runLater(() -> statusLabel.setText("录音中... 请说话"));
