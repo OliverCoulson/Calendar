@@ -7,29 +7,29 @@ import org.duiduidui.calendar.service.VoiceService;
 import org.duiduidui.calendar.voice.AudioRecorder;
 import org.duiduidui.calendar.voice.TtsPlayer;
 import org.duiduidui.calendar.voice.aliyun.AliyunASRClient;
+import org.duiduidui.calendar.voice.aliyun.AliyunTTSClient;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/**
- * 语音服务实现 —— 阿里云 ASR + TTS。
- * 编排音频录制、云端识别、语音播放的完整流程。
- */
 public class VoiceServiceImpl implements VoiceService {
 
     private final List<RecordingListener> recordingListeners = new CopyOnWriteArrayList<>();
     private final List<RecognitionListener> recognitionListeners = new CopyOnWriteArrayList<>();
     private final AliyunASRClient asrClient;
+    private final TtsPlayer ttsPlayer;
 
     private static final long MAX_RECORD_MS = 10_000;
     private static final long SILENCE_THRESHOLD_MS = 1_500;
 
     public VoiceServiceImpl(String appKey, String accessKeyId, String accessKeySecret) {
         this.asrClient = new AliyunASRClient(appKey, accessKeyId, accessKeySecret);
+        this.ttsPlayer = new TtsPlayer(new AliyunTTSClient(appKey, accessKeyId, accessKeySecret));
     }
 
     public VoiceServiceImpl(String appKey, String accessKeyId, String accessKeySecret, String gateway) {
         this.asrClient = new AliyunASRClient(appKey, accessKeyId, accessKeySecret, gateway);
+        this.ttsPlayer = new TtsPlayer(new AliyunTTSClient(appKey, accessKeyId, accessKeySecret, gateway));
     }
 
     @Override
@@ -70,19 +70,19 @@ public class VoiceServiceImpl implements VoiceService {
 
     @Override
     public void speak(String text) {
-        TtsPlayer.play(text);
+        ttsPlayer.play(text);
     }
 
     @Override
     public void stopSpeaking() {
-        TtsPlayer.stop();
+        ttsPlayer.stop();
     }
 
     @Override
     public boolean isListening() { return false; }
 
     @Override
-    public boolean isSpeaking() { return TtsPlayer.isPlaying(); }
+    public boolean isSpeaking() { return ttsPlayer.isPlaying(); }
 
     @Override
     public void addRecordingListener(RecordingListener listener) {

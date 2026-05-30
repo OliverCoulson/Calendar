@@ -115,6 +115,9 @@ public class MainViewController {
 
     /** 右下角弹出提醒通知。 */
     private void showReminderPopup(CalendarEvent event) {
+        // TTS 播报
+        voiceController.speakReminder(event.getTitle());
+
         Stage popup = new Stage();
         popup.setTitle("提醒");
         popup.setAlwaysOnTop(true);

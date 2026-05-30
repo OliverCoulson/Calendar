@@ -81,6 +81,11 @@ public class VoiceController {
         }, "voice-thread").start();
     }
 
+    /** TTS 播报指定文本（外部调用，如提醒弹窗）。 */
+    public void speakReminder(String text) {
+        voiceService.speak("提醒：" + text);
+    }
+
     /** 键盘输入入口（debug 模式使用）。 */
     public void onTextSubmit(String text) {
         processText(text);
@@ -95,6 +100,9 @@ public class VoiceController {
         String sysResp = executeIntent(result);
         responseLabel.setText("系统: " + sysResp);
         statusLabel.setText("识别完成");
+
+        // TTS 播报
+        voiceService.speak(sysResp);
     }
 
     /** 根据 NLP 解析结果执行对应操作，返回系统提示文本。 */
