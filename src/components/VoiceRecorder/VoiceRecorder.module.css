@@ -1,0 +1,293 @@
+.recorder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+}
+
+.topArea {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  width: 100%;
+}
+
+.centerArea {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* ---- 占位提示 ---- */
+
+.placeholderHint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  border: 1px dashed #e5e7eb;
+  border-radius: 12px;
+  background: #fafafa;
+}
+
+.placeholderText {
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+/* ---- 可编辑文本域 ---- */
+
+.editContainer {
+  position: relative;
+  border: 1px solid #d1d5db;
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.editContainer:focus-within {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+/* 聆听中的边框样式 */
+.listeningEdit {
+  border-color: #a5b4fc;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08);
+}
+
+.listeningEdit:focus-within {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+
+.editTextarea {
+  display: block;
+  width: 100%;
+  min-height: 110px;
+  max-height: 220px;
+  padding: 14px 16px;
+  border: none;
+  outline: none;
+  font-size: 15px;
+  line-height: 1.8;
+  color: #1f2937;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Microsoft YaHei', sans-serif;
+  resize: vertical;
+  background: transparent;
+}
+
+.editTextarea::placeholder {
+  color: #c4c4c4;
+}
+
+.editTextarea::-webkit-scrollbar {
+  width: 4px;
+}
+
+.editTextarea::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 2px;
+}
+
+/* 聆听中的 badge */
+
+.listeningBadge {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: rgba(79, 70, 229, 0.08);
+  color: #4f46e5;
+  font-size: 11px;
+  font-weight: 500;
+  pointer-events: none;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: dotBlink 1s step-end infinite;
+}
+
+@keyframes dotBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ---- 工具栏 ---- */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.toolBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #6b7280;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.toolBtn:hover {
+  background: #f3f4f6;
+  color: #374151;
+  border-color: #d1d5db;
+}
+
+.toolBtn:first-child:hover {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.copiedToolBtn {
+  color: #059669 !important;
+  border-color: #a7f3d0 !important;
+  background: #ecfdf5 !important;
+}
+
+/* ---- 保存操作栏 ---- */
+
+.saveBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  animation: slideUp 0.2s ease-out;
+  flex-wrap: wrap;
+}
+
+.saveHint {
+  font-size: 14px;
+  color: #166534;
+  font-weight: 500;
+}
+
+.saveActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.saveBtn {
+  padding: 7px 18px;
+  border: none;
+  border-radius: 8px;
+  background: #16a34a;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.saveBtn:hover {
+  background: #15803d;
+}
+
+.discardBtn {
+  padding: 7px 18px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  color: #6b7280;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.discardBtn:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+/* ---- NLP 反馈条 ---- */
+
+.feedbackBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  font-size: 14px;
+  color: #1e40af;
+  animation: slideUp 0.2s ease-out;
+}
+
+.feedbackIcon {
+  flex-shrink: 0;
+  color: #3b82f6;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ---- 响应式 ---- */
+
+@media (max-width: 640px) {
+  .topArea {
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .centerArea {
+    width: 100%;
+  }
+
+  .saveBar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .saveActions {
+    justify-content: flex-end;
+  }
+}
