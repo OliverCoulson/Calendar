@@ -52,6 +52,12 @@ public class AppConfig {
         return get("storage.db.path", "events.db");
     }
 
+    // ===== 调试模式 =====
+
+    public boolean isDebugMode() {
+        return "true".equalsIgnoreCase(get("debug.mode", "false"));
+    }
+
     // ===== 通用方法 =====
 
     private String get(String key) {
