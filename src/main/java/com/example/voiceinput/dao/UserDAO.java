@@ -17,6 +17,8 @@ public class UserDAO {
             String dbPath = System.getProperty("user.dir") + "/calendar.db";
             this.connection = DriverManager.getConnection("jdbc:sqlite:" + dbPath);
             try (Statement stmt = connection.createStatement()) {
+                stmt.execute("PRAGMA journal_mode=WAL");
+                stmt.execute("PRAGMA busy_timeout=5000");
                 stmt.execute("""
                     CREATE TABLE IF NOT EXISTS users (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -136,13 +138,15 @@ public class UserDAO {
     /** 查询发给我的未处理消息 */
     public List<Map<String, Object>> pendingMessages(long userId) {
         System.out.println("[Msg] 查询未处理: userId=" + userId);
+
         String sql = """
             SELECT m.id, m.from_user_id, m.alias, m.status, m.created_at,
                    u.nickname, u.phone, u.avatar, u.type
             FROM bind_messages m JOIN users u ON m.from_user_id = u.id
             WHERE m.to_user_id = ? AND m.status = 0 ORDER BY m.created_at DESC
             """;
-        return queryList(sql, userId);
+        List<Map<String, Object>> result = queryList(sql, userId);
+        return result;
     }
 
     /** 未处理消息数 */
@@ -211,8 +215,8 @@ public class UserDAO {
         User me = findById(userId);
         if (me == null) return List.of();
         String sql = me.getType().equals("guardian")
-            ? "SELECT r.*, u.nickname, u.phone, u.avatar, u.type FROM user_relationships r JOIN users u ON r.elderly_id = u.id WHERE r.guardian_id = ?"
-            : "SELECT r.*, u.nickname, u.phone, u.avatar, u.type FROM user_relationships r JOIN users u ON r.guardian_id = u.id WHERE r.elderly_id = ?";
+            ? "SELECT r.*, u.id AS userId, u.nickname, u.phone, u.avatar, u.type FROM user_relationships r JOIN users u ON r.elderly_id = u.id WHERE r.guardian_id = ?"
+            : "SELECT r.*, u.id AS userId, u.nickname, u.phone, u.avatar, u.type FROM user_relationships r JOIN users u ON r.guardian_id = u.id WHERE r.elderly_id = ?";
         List<Map<String, Object>> list = new ArrayList<>();
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setLong(1, userId);
@@ -220,6 +224,7 @@ public class UserDAO {
                 while (rs.next()) {
                     Map<String, Object> m = new LinkedHashMap<>();
                     m.put("id", rs.getLong("id"));
+                    m.put("userId", rs.getLong("userId"));
                     m.put("nickname", rs.getString("nickname"));
                     m.put("phone", rs.getString("phone"));
                     m.put("avatar", rs.getString("avatar"));

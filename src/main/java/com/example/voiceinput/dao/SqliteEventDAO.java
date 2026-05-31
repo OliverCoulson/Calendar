@@ -30,14 +30,16 @@ public class SqliteEventDAO implements EventDAO {
         ")";
 
     private final Connection connection;
-    private long currentUserId = 0;
-    private long viewingUserId = 0; // 监护人正在查看的老年人 ID
+    private final ThreadLocal<Long> currentUserId = ThreadLocal.withInitial(() -> 0L);
+    private final ThreadLocal<Long> viewingUserId = ThreadLocal.withInitial(() -> 0L); // 监护人正在查看的老年人 ID
 
     public SqliteEventDAO() {
         try {
             String dbPath = System.getProperty("user.dir") + "/calendar.db";
             this.connection = DriverManager.getConnection("jdbc:sqlite:" + dbPath);
             try (Statement stmt = connection.createStatement()) {
+                stmt.execute("PRAGMA journal_mode=WAL");
+                stmt.execute("PRAGMA busy_timeout=5000");
                 stmt.execute(CREATE_TABLE);
                 try { stmt.execute("ALTER TABLE calendar_events ADD COLUMN created_by INTEGER NOT NULL DEFAULT 0"); }
                 catch (SQLException ignored) {}
@@ -50,12 +52,12 @@ public class SqliteEventDAO implements EventDAO {
     }
 
     /** 设置当前操作者 */
-    public void setCurrentUser(long userId) { this.currentUserId = userId; }
+    public void setCurrentUser(long userId) { this.currentUserId.set(userId); }
     /** 设置正在查看的目标用户（监护人查看老人日历时用） */
-    public void setViewingUser(long userId) { this.viewingUserId = userId; }
+    public void setViewingUser(long userId) { this.viewingUserId.set(userId); }
 
     /** 实际写入事件的目标用户 ID */
-    private long targetUserId() { return viewingUserId > 0 ? viewingUserId : currentUserId; }
+    private long targetUserId() { long v = viewingUserId.get(); return v > 0 ? v : currentUserId.get(); }
 
     @Override public void initialize() {}
 
@@ -68,6 +70,7 @@ public class SqliteEventDAO implements EventDAO {
      */
     @Override
     public void insert(CalendarEvent event) {
+        long userId = targetUserId();
         String sql = "INSERT INTO calendar_events (id, title, start_time, end_time, location, description, remind_time, reminded, user_id, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setString(1, event.getId());
@@ -78,8 +81,8 @@ public class SqliteEventDAO implements EventDAO {
             ps.setString(6, event.getDescription());
             ps.setString(7, event.getRemindTime() != null ? event.getRemindTime().format(FMT) : null);
             ps.setInt(8, event.isReminded() ? 1 : 0);
-            ps.setLong(9, targetUserId());
-            ps.setLong(10, currentUserId);
+            ps.setLong(9, userId);
+            ps.setLong(10, currentUserId.get());
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("插入事件失败", e);
@@ -95,11 +98,11 @@ public class SqliteEventDAO implements EventDAO {
      */
     @Override
     public boolean deleteById(String id) {
-        if (currentUserId == 0) return false;
+        if (currentUserId.get() == 0) return false;
         String sql = "DELETE FROM calendar_events WHERE id = ? AND created_by = ?";
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setString(1, id);
-            ps.setLong(2, currentUserId);
+            ps.setLong(2, currentUserId.get());
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
             throw new RuntimeException("删除事件失败", e);
@@ -108,7 +111,7 @@ public class SqliteEventDAO implements EventDAO {
 
     @Override
     public boolean update(CalendarEvent event) {
-        if (currentUserId == 0) return false;
+        if (currentUserId.get() == 0) return false;
         String sql = "UPDATE calendar_events SET title=?, start_time=?, end_time=?, location=?, description=?, remind_time=?, reminded=? WHERE id=? AND created_by=?";
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setString(1, event.getTitle());
@@ -119,7 +122,7 @@ public class SqliteEventDAO implements EventDAO {
             ps.setString(6, event.getRemindTime() != null ? event.getRemindTime().format(FMT) : null);
             ps.setInt(7, event.isReminded() ? 1 : 0);
             ps.setString(8, event.getId());
-            ps.setLong(9, currentUserId);
+            ps.setLong(9, currentUserId.get());
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
             throw new RuntimeException("更新事件失败", e);
@@ -129,16 +132,16 @@ public class SqliteEventDAO implements EventDAO {
 
     @Override
     public List<CalendarEvent> findAll() {
-        if (currentUserId == 0) return List.of();
+        if (currentUserId.get() == 0) return List.of();
         // 查看自己的 + 监护人查看被监护人
-        if (viewingUserId > 0)
-            return queryList("SELECT * FROM calendar_events WHERE user_id = ? ORDER BY start_time", viewingUserId);
-        return queryList("SELECT * FROM calendar_events WHERE user_id = ? ORDER BY start_time", currentUserId);
+        if (viewingUserId.get() > 0)
+            return queryList("SELECT * FROM calendar_events WHERE user_id = ? ORDER BY start_time", viewingUserId.get());
+        return queryList("SELECT * FROM calendar_events WHERE user_id = ? ORDER BY start_time", currentUserId.get());
     }
 
     @Override
     public List<CalendarEvent> findByTimeRange(LocalDateTime start, LocalDateTime end) {
-        long uid = viewingUserId > 0 ? viewingUserId : currentUserId;
+        long uid = viewingUserId.get() > 0 ? viewingUserId.get() : currentUserId.get();
         if (uid == 0) return List.of();
         return queryList(
             "SELECT * FROM calendar_events WHERE user_id = ? AND start_time < ? AND COALESCE(end_time, start_time) > ? ORDER BY start_time",
@@ -147,15 +150,17 @@ public class SqliteEventDAO implements EventDAO {
 
     @Override
     public List<CalendarEvent> findByKeyword(String keyword) {
-        if (currentUserId == 0) return List.of();
+        if (currentUserId.get() == 0) return List.of();
+        long uid1 = currentUserId.get();
+        long uid2 = viewingUserId.get() > 0 ? viewingUserId.get() : currentUserId.get();
         return queryList(
             "SELECT * FROM calendar_events WHERE (user_id = ? OR user_id = ?) AND (title LIKE ? OR description LIKE ?) ORDER BY start_time",
-            currentUserId, viewingUserId > 0 ? viewingUserId : currentUserId, "%" + keyword + "%", "%" + keyword + "%");
+            uid1, uid2, "%" + keyword + "%", "%" + keyword + "%");
     }
 
     @Override
     public List<CalendarEvent> findByTimeAndTitle(LocalDateTime time, String titleKeyword) {
-        long uid = viewingUserId > 0 ? viewingUserId : currentUserId;
+        long uid = viewingUserId.get() > 0 ? viewingUserId.get() : currentUserId.get();
         if (uid == 0) return List.of();
         return queryList(
             "SELECT * FROM calendar_events WHERE user_id = ? AND start_time LIKE ? AND title LIKE ? ORDER BY start_time",
@@ -164,18 +169,18 @@ public class SqliteEventDAO implements EventDAO {
 
     @Override
     public List<CalendarEvent> findUpcomingReminders(LocalDateTime now, int minutesAhead) {
-        if (currentUserId == 0) return List.of();
+        if (currentUserId.get() == 0) return List.of();
         LocalDateTime end = now.plusMinutes(minutesAhead);
         return queryList(
             "SELECT * FROM calendar_events WHERE user_id = ? AND remind_time >= ? AND remind_time < ? AND reminded = 0",
-            currentUserId, now.format(FMT), end.format(FMT));
+            currentUserId.get(), now.format(FMT), end.format(FMT));
     }
 
     @Override
     public void markReminded(String id) {
         try (PreparedStatement ps = connection.prepareStatement(
                 "UPDATE calendar_events SET reminded = 1 WHERE id = ? AND user_id = ?")) {
-            ps.setString(1, id); ps.setLong(2, currentUserId); ps.executeUpdate();
+            ps.setString(1, id); ps.setLong(2, currentUserId.get()); ps.executeUpdate();
         } catch (SQLException e) { throw new RuntimeException("标记失败", e); }
     }
 

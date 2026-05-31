@@ -62,6 +62,7 @@ public class CalendarController {
         User me = auth(token);
         if (me == null) return ResponseEntity.ok(List.of());
         eventDAO.setCurrentUser(me.getId());
+        eventDAO.setViewingUser(0); // 重置，避免上一请求残留
         if (viewUser > 0 && canView(me, viewUser)) eventDAO.setViewingUser(viewUser);
         return ResponseEntity.ok(calendarService.getAllEvents());
     }
@@ -74,6 +75,7 @@ public class CalendarController {
         User me = auth(token);
         if (me == null) return ResponseEntity.ok(List.of());
         eventDAO.setCurrentUser(me.getId());
+        eventDAO.setViewingUser(0); // 重置
         if (viewUser > 0 && canView(me, viewUser)) eventDAO.setViewingUser(viewUser);
         LocalDateTime st = LocalDateTime.parse(start, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
         LocalDateTime ed = LocalDateTime.parse(end, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
@@ -102,6 +104,7 @@ public class CalendarController {
     @PostMapping("/voice/execute")
     public ResponseEntity<Map<String, Object>> voiceExecute(
             @RequestHeader(value = "X-Token", defaultValue = "") String token,
+            @RequestParam(value = "viewUser", defaultValue = "0") long viewUser,
             @RequestBody VoiceRequest request) {
         User me = auth(token);
         if (me == null) return ResponseEntity.ok(Map.of("success", false, "message", "未登录"));
@@ -115,6 +118,13 @@ public class CalendarController {
             return ResponseEntity.ok(Map.of("success", false, "message", "未识别到有效内容"));
 
         eventDAO.setCurrentUser(me.getId());
+        eventDAO.setViewingUser(0);
+        if (viewUser > 0 && canView(me, viewUser)) {
+            eventDAO.setViewingUser(viewUser);
+            System.out.println("[语音执行] 切换到用户 " + viewUser + " 的日历");
+        }
+        System.out.println("[语音执行] 当前用户ID=" + me.getId() + " type=" + me.getType()
+            + " viewUser=" + viewUser + " currentUserId=" + me.getId());
 
         // NLP 解析：LLM → rule 回退
         ParsedResult result = llmProcessor.parse(text);
@@ -276,7 +286,7 @@ public class CalendarController {
     private boolean canView(User me, long targetId) {
         if (!"guardian".equals(me.getType())) return false;
         for (Map<String, Object> r : userDAO.approvedRelations(me.getId())) {
-            if (r.get("id") != null && ((Number) r.get("id")).longValue() == targetId) return true;
+            if (r.get("userId") != null && ((Number) r.get("userId")).longValue() == targetId) return true;
         }
         return false;
     }
@@ -315,6 +325,13 @@ public class CalendarController {
         LocalDateTime start = timeRange[0];
         LocalDateTime end = timeRange.length > 1 ? timeRange[1] : null;
 
+        // 校验：开始时间不能早于当前系统时间
+        if (start.isBefore(LocalDateTime.now())) {
+            resp.put("success", false);
+            resp.put("message", "事件开始时间不能早于当前时间");
+            return resp;
+        }
+
         // 去重：同日期同标题不重复添加
         List<CalendarEvent> existing = calendarService.queryByTimeAndTitle(start, title);
         boolean isDuplicate = existing.stream().anyMatch(e -> e.getTitle().equals(title));
@@ -340,7 +357,9 @@ public class CalendarController {
         if (location != null && !location.isBlank()) event.setLocation(location);
         event.setDescription((String) entities.get("description"));
 
+        System.out.println("[语音执行-ADD] 准备添加: title=" + title + " start=" + start + " event.id=" + event.getId());
         calendarService.addEvent(event);
+        System.out.println("[语音执行-ADD] 添加完成: " + event.getId());
         resp.put("success", true);
         resp.put("message", "已添加: " + title);
         resp.put("event", event);
