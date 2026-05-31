@@ -80,68 +80,132 @@ public class CalendarController {
         return ResponseEntity.ok(calendarService.queryByTimeRange(st, ed));
     }
 
-    // ==================== 添加事件 ====================
+    // ==================== TODO: 语音执行（ADD / DELETE / QUERY） ====================
 
+    /**
+     * TODO: POST /api/calendar/voice/execute
+     * 接收语音文本 → NLP 解析 → 根据 intent 自动执行 ADD / DELETE / QUERY。
+     * 这是核心接口，把 /voice 的解析结果直接落地为日历操作。
+     *
+     * 入参：{ text: "明天下午三点开会" }
+     *
+     * 实现步骤：
+     *   1. 调用 /voice 的 NLP 解析逻辑获取 intent + entities
+     *   2. intent == ADD    → 执行添加（参考 events/add TODO）
+     *   3. intent == DELETE → 执行删除（搜索候选 → 单候选直接删 / 多候选返回列表）
+     *   4. intent == QUERY  → 按时间/关键词查询，格式化返回
+     *   5. 返回 { success, intent, message, events, candidates? }
+     *
+     * 参考：voice-input-backend/CalendarController.processVoice()
+     *       voice-input-backend/CalendarController.executeAdd/Delete/Query()
+     */
+    @PostMapping("/voice/execute")
+    public ResponseEntity<Map<String, Object>> voiceExecute(
+            @RequestHeader(value = "X-Token", defaultValue = "") String token,
+            @RequestBody VoiceRequest request) {
+        // TODO: 实现语音→日历操作的完整流程
+        return ResponseEntity.ok(Map.of("success", false, "message", "语音执行功能开发中"));
+    }
+
+    // ==================== TODO: 添加事件 ====================
+
+    /**
+     * TODO: POST /api/calendar/events/add
+     * 接收 /voice 返回的 NLP 实体，写入数据库。
+     *
+     * 入参：{ title, startTime, endTime?, location?, targetUserId? }
+     *   - targetUserId: 监护人为被监护人添加事件时传入
+     *
+     * 需要实现：
+     *   1. 解析 token → 当前用户（参考 auth() 方法）
+     *   2. 如果 targetUserId 存在且用户是监护人，设置 eventDAO.setViewingUser(targetUserId)
+     *   3. 冲突检测：查询同时间段已有事件（eventDAO.findByTimeRange），有冲突返回提醒
+     *   4. 去重：同日期同标题事件不重复添加
+     *   5. calendarService.addEvent(event)
+     *   6. 返回 { success, message, events }
+     *
+     * 参考：voice-input-backend/CalendarController.executeAdd()
+     */
     @PostMapping("/events/add")
     public ResponseEntity<Map<String, Object>> addEvent(
             @RequestHeader(value = "X-Token", defaultValue = "") String token,
             @RequestBody Map<String, Object> body) {
-        User me = auth(token);
-        if (me == null) return ResponseEntity.ok(Map.of("success", false, "message", "请先登录"));
-
-        String title = (String) body.getOrDefault("title", "事项");
-        String location = (String) body.get("location");
-        String startStr = (String) body.get("startTime");
-        if (startStr == null) return ResponseEntity.ok(Map.of("success", false, "message", "缺少时间"));
-        LocalDateTime startTime = LocalDateTime.parse(startStr, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-        LocalDateTime endTime = null;
-        String endStr = (String) body.get("endTime");
-        if (endStr != null && !endStr.isEmpty()) endTime = LocalDateTime.parse(endStr, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-
-        // 目标用户：监护人可替老人添加
-        long targetUserId = me.getId();
-        Object targetObj = body.get("targetUserId");
-        if (targetObj != null && targetObj instanceof Number) {
-            long tid = ((Number) targetObj).longValue();
-            if (tid != me.getId() && canView(me, tid)) targetUserId = tid;
-        }
-
-        eventDAO.setCurrentUser(me.getId());
-        if (targetUserId != me.getId()) eventDAO.setViewingUser(targetUserId);
-
-        // 去重
-        boolean noSpecificTime = startTime.toLocalTime().getHour() == 0 && startTime.toLocalTime().getMinute() == 0;
-        if (!noSpecificTime) {
-            List<CalendarEvent> sameDay = calendarService.queryByTimeRange(
-                startTime.toLocalDate().atStartOfDay(), startTime.toLocalDate().plusDays(1).atStartOfDay());
-            if (sameDay.stream().anyMatch(e -> e.getTitle().equals(title)))
-                return ResponseEntity.ok(Map.of("success", false, "message", "已存在相同事件"));
-        }
-
-        CalendarEvent event = new CalendarEvent(title, startTime, endTime);
-        if (location != null) event.setLocation(location.toString());
-        calendarService.addEvent(event);
-
-        String date = startTime.toLocalDate().toString();
-        String hint = targetUserId != me.getId() ? "（为 " + userDAO.findById(targetUserId).getNickname() + " 添加）" : "";
-        return ResponseEntity.ok(Map.of("success", true,
-            "message", "已添加「" + title + "」" + date + hint,
-            "events", calendarService.getAllEvents()));
+        // TODO: 实现添加事件逻辑
+        return ResponseEntity.ok(Map.of("success", false, "message", "添加功能开发中"));
     }
 
-    // ==================== 删除事件 ====================
+    // ==================== TODO: 删除事件 ====================
 
+    /**
+     * TODO: DELETE /api/calendar/events/{id}
+     * 删除指定事件。
+     *
+     * 需要实现：
+     *   1. 解析 token → 当前用户
+     *   2. eventDAO.setCurrentUser(userId) 设置当前用户
+     *   3. calendarService.deleteEvent(id) — DAO 层已限制 created_by = 当前用户
+     *   4. 返回 { success, message, events }
+     *
+     * 额外（进阶）：
+     *   - 支持模糊匹配删除（POST /events/delete-by-voice）
+     *     接收 /voice 的 DELETE intent 实体（keyword + date）
+     *     搜索候选事件列表，单候选直接删，多候选返回列表让用户选
+     *     参考：voice-input-backend/CalendarController.executeDelete()
+     */
     @DeleteMapping("/events/{id}")
     public ResponseEntity<Map<String, Object>> deleteEvent(
             @RequestHeader(value = "X-Token", defaultValue = "") String token,
             @PathVariable String id) {
-        User me = auth(token);
-        if (me == null) return ResponseEntity.ok(Map.of("success", false, "message", "请先登录"));
-        eventDAO.setCurrentUser(me.getId());
-        boolean deleted = calendarService.deleteEvent(id);
-        return ResponseEntity.ok(Map.of("success", deleted,
-            "message", deleted ? "已删除" : "无法删除（只能删除自己创建的事件）",
-            "events", calendarService.getAllEvents()));
+        // TODO: 实现删除事件逻辑
+        return ResponseEntity.ok(Map.of("success", false, "message", "删除功能开发中"));
+    }
+
+    // ==================== TODO: 查看事件（语音驱动） ====================
+
+    /**
+     * TODO: POST /api/calendar/events/query
+     * 根据 NLP 解析的实体查询事件，返回格式化结果。
+     *
+     * 入参：{ keyword?, date?, timeRange? }（来自 /voice 返回的 entities）
+     *
+     * 需要实现：
+     *   1. 如果有 date   → calendarService.queryByTimeRange(当天 00:00, 次日 00:00)
+     *   2. 如果有 keyword → calendarService.queryByKeyword(keyword)
+     *   3. 都没有         → calendarService.getAllEvents()
+     *   4. 格式化返回：单事件显示详情，多事件列出概要
+     *
+     * 参考：voice-input-backend/CalendarController.executeQuery()
+     */
+    @PostMapping("/events/query")
+    public ResponseEntity<Map<String, Object>> queryEvents(
+            @RequestHeader(value = "X-Token", defaultValue = "") String token,
+            @RequestBody Map<String, Object> body) {
+        // TODO: 实现语音驱动的查询
+        return ResponseEntity.ok(Map.of("success", false, "message", "查询功能开发中"));
+    }
+
+    // ==================== TODO: 删除事件（语音驱动） ====================
+
+    /**
+     * TODO: POST /api/calendar/events/delete-by-voice
+     * 根据 NLP 实体模糊搜索并删除事件。
+     *
+     * 入参：{ keyword, date? }（来自 /voice 返回的 DELETE intent entities）
+     *
+     * 需要实现：
+     *   1. 按 keyword + date 搜索候选事件
+     *   2. 单候选 → 直接删除
+     *   3. 多候选 → 返回 candidates 列表让用户选择
+     *   4. 无候选 → 返回提示
+     *
+     * 参考：voice-input-backend/CalendarController.executeDelete()
+     */
+    @PostMapping("/events/delete-by-voice")
+    public ResponseEntity<Map<String, Object>> deleteByVoice(
+            @RequestHeader(value = "X-Token", defaultValue = "") String token,
+            @RequestBody Map<String, Object> body) {
+        // TODO: 实现语音驱动的删除
+        return ResponseEntity.ok(Map.of("success", false, "message", "语音删除功能开发中"));
     }
 
     // ==================== 辅助 ====================

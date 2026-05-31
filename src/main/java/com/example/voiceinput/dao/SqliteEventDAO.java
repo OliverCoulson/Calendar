@@ -59,38 +59,29 @@ public class SqliteEventDAO implements EventDAO {
 
     @Override public void initialize() {}
 
+    // ==================== TODO: 插入事件 ====================
+    /**
+     * TODO: INSERT INTO calendar_events
+     * 表结构: id, title, start_time, end_time, location, description, remind_time, reminded, user_id, created_by
+     * user_id = targetUserId() (事件归属，监护人替老人添加时 = 老人ID)
+     * created_by = currentUserId (操作者)
+     */
     @Override
     public void insert(CalendarEvent event) {
-        String sql = "INSERT INTO calendar_events (id, title, start_time, end_time, location, description, remind_time, reminded, user_id, created_by) " +
-                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
-            ps.setString(1, event.getId());
-            ps.setString(2, event.getTitle());
-            ps.setString(3, event.getStartTime().format(FMT));
-            ps.setString(4, event.getEndTime() != null ? event.getEndTime().format(FMT) : null);
-            ps.setString(5, event.getLocation());
-            ps.setString(6, event.getDescription());
-            ps.setString(7, event.getRemindTime() != null ? event.getRemindTime().format(FMT) : null);
-            ps.setInt(8, event.isReminded() ? 1 : 0);
-            ps.setLong(9, targetUserId());       // 事件归属谁
-            ps.setLong(10, currentUserId);       // 谁创建的
-            ps.executeUpdate();
-        } catch (SQLException e) { throw new RuntimeException("插入失败", e); }
+        // TODO: 实现插入事件
     }
 
-    @Override public void insertAll(List<CalendarEvent> events) { for (CalendarEvent e : events) insert(e); }
+    @Override public void insertAll(List<CalendarEvent> events) { /* TODO */ }
 
+    // ==================== TODO: 删除事件 ====================
+    /**
+     * TODO: DELETE FROM calendar_events WHERE id = ? AND created_by = ?
+     * 只能删除自己创建的事件
+     */
     @Override
     public boolean deleteById(String id) {
-        // 只能删除自己创建的事件（监护人不能删老人自己建的）
-        String sql = currentUserId > 0
-            ? "DELETE FROM calendar_events WHERE id = ? AND created_by = ?"
-            : "DELETE FROM calendar_events WHERE id = ?";
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
-            ps.setString(1, id);
-            if (currentUserId > 0) ps.setLong(2, currentUserId);
-            return ps.executeUpdate() > 0;
-        } catch (SQLException e) { throw new RuntimeException("删除失败", e); }
+        // TODO: 实现删除事件
+        return false;
     }
 
     @Override public boolean update(CalendarEvent event) { return false; }

@@ -7,7 +7,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
 
 @Service
 public class CalendarServiceImpl implements CalendarService {
@@ -18,23 +17,33 @@ public class CalendarServiceImpl implements CalendarService {
         this.eventDAO = eventDAO;
     }
 
+    // ==================== TODO: 添加事件 ====================
+    /**
+     * TODO: 实现添加事件逻辑
+     * 1. 生成 UUID 作为 event.id
+     * 2. 设置默认提醒时间（startTime 前 10 分钟）
+     * 3. eventDAO.insert(event) 写入数据库
+     * 参考：voice-input-backend/CalendarServiceImpl.addEvent()
+     */
     @Override
     public boolean addEvent(CalendarEvent event) {
-        if (event.getId() == null) {
-            event.setId(UUID.randomUUID().toString());
-        }
-        if (event.getRemindTime() == null && event.getStartTime() != null) {
-            event.setRemindTime(event.getStartTime().minusMinutes(15));
-        }
-        // 冲突检测但不阻止，仅通过返回值告知
-        eventDAO.insert(event);
-        return true;
+        // TODO: 实现添加事件
+        return false;
     }
 
+    // ==================== TODO: 删除事件 ====================
+    /**
+     * TODO: 实现删除事件逻辑
+     * 1. eventDAO.deleteById(id) 删除
+     * DAO 层已限制 created_by = 当前用户，只能删自己创建的
+     */
     @Override
     public boolean deleteEvent(String id) {
-        return eventDAO.deleteById(id);
+        // TODO: 实现删除事件
+        return false;
     }
+
+    // ==================== 查询事件（已实现） ====================
 
     @Override
     public List<CalendarEvent> queryByTimeRange(LocalDateTime start, LocalDateTime end) {
