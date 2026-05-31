@@ -1,0 +1,17 @@
+server:
+  port: 3002
+
+spring:
+  application:
+    name: voice-input-backend
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    serialization:
+      write-dates-as-timestamps: false
+
+nlp:
+  llm:
+    enabled: true
+    url: http://localhost:11434/api/chat
+    model: qwen2.5:3b
+    timeout: 60000
