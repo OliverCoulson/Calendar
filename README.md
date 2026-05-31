@@ -289,3 +289,8 @@ nlp.llm.model=qwen2.5:3b
 ```
 
 Ollama 不可用时自动降级为规则引擎。
+
+
+
+## 演示视频
+【日历-演示视频】 https://www.bilibili.com/video/BV1uhVU6WESV/?share_source=copy_web&vd_source=941f69ebe6affead31df6b96cbe68632
