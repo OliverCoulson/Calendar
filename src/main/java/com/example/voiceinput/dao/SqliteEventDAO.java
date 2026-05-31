@@ -68,7 +68,22 @@ public class SqliteEventDAO implements EventDAO {
      */
     @Override
     public void insert(CalendarEvent event) {
-        // TODO: 实现插入事件
+        String sql = "INSERT INTO calendar_events (id, title, start_time, end_time, location, description, remind_time, reminded, user_id, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, event.getId());
+            ps.setString(2, event.getTitle());
+            ps.setString(3, event.getStartTime() != null ? event.getStartTime().format(FMT) : null);
+            ps.setString(4, event.getEndTime() != null ? event.getEndTime().format(FMT) : null);
+            ps.setString(5, event.getLocation());
+            ps.setString(6, event.getDescription());
+            ps.setString(7, event.getRemindTime() != null ? event.getRemindTime().format(FMT) : null);
+            ps.setInt(8, event.isReminded() ? 1 : 0);
+            ps.setLong(9, targetUserId());
+            ps.setLong(10, currentUserId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("插入事件失败", e);
+        }
     }
 
     @Override public void insertAll(List<CalendarEvent> events) { /* TODO */ }
@@ -80,11 +95,36 @@ public class SqliteEventDAO implements EventDAO {
      */
     @Override
     public boolean deleteById(String id) {
-        // TODO: 实现删除事件
-        return false;
+        if (currentUserId == 0) return false;
+        String sql = "DELETE FROM calendar_events WHERE id = ? AND created_by = ?";
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, id);
+            ps.setLong(2, currentUserId);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            throw new RuntimeException("删除事件失败", e);
+        }
     }
 
-    @Override public boolean update(CalendarEvent event) { return false; }
+    @Override
+    public boolean update(CalendarEvent event) {
+        if (currentUserId == 0) return false;
+        String sql = "UPDATE calendar_events SET title=?, start_time=?, end_time=?, location=?, description=?, remind_time=?, reminded=? WHERE id=? AND created_by=?";
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, event.getTitle());
+            ps.setString(2, event.getStartTime() != null ? event.getStartTime().format(FMT) : null);
+            ps.setString(3, event.getEndTime() != null ? event.getEndTime().format(FMT) : null);
+            ps.setString(4, event.getLocation());
+            ps.setString(5, event.getDescription());
+            ps.setString(6, event.getRemindTime() != null ? event.getRemindTime().format(FMT) : null);
+            ps.setInt(7, event.isReminded() ? 1 : 0);
+            ps.setString(8, event.getId());
+            ps.setLong(9, currentUserId);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            throw new RuntimeException("更新事件失败", e);
+        }
+    }
     @Override public CalendarEvent findById(String id) { return null; }
 
     @Override

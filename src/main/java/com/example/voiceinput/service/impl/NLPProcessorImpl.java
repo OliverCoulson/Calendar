@@ -25,6 +25,7 @@ public class NLPProcessorImpl implements NLPProcessor {
     private List<String> triggerAdd;
     private List<String> triggerDelete;
     private List<String> triggerQuery;
+    private List<String> triggerModify;
     private List<String> stopWords;
     private List<String> fillers;
 
@@ -57,10 +58,11 @@ public class NLPProcessorImpl implements NLPProcessor {
         this.triggerAdd    = map.getOrDefault("trigger_add", List.of());
         this.triggerDelete = map.getOrDefault("trigger_delete", List.of());
         this.triggerQuery  = map.getOrDefault("trigger_query", List.of());
+        this.triggerModify = map.getOrDefault("trigger_modify", List.of());
         this.stopWords     = map.getOrDefault("stop_word", List.of());
         this.fillers       = map.getOrDefault("filler", List.of());
         System.out.println("[NLP-Rule] 已加载 " +
-            (triggerAdd.size()+triggerDelete.size()+triggerQuery.size()) + " 触发词, " +
+            (triggerAdd.size()+triggerDelete.size()+triggerQuery.size()+triggerModify.size()) + " 触发词, " +
             stopWords.size() + " 停用词, " + fillers.size() + " 语气词");
     }
 
@@ -142,10 +144,11 @@ public class NLPProcessorImpl implements NLPProcessor {
     private IntentType classifyIntent(String text) {
         IntentType best = IntentType.UNKNOWN;
         int bestPos = Integer.MAX_VALUE;
-        // 按优先级: add > delete > query
+        // 按优先级: add > delete > modify > query
         Map<IntentType, List<String>> triggers = new LinkedHashMap<>();
         triggers.put(IntentType.ADD, triggerAdd);
         triggers.put(IntentType.DELETE, triggerDelete);
+        triggers.put(IntentType.MODIFY, triggerModify);
         triggers.put(IntentType.QUERY, triggerQuery);
         for (Map.Entry<IntentType, List<String>> e : triggers.entrySet()) {
             for (String t : e.getValue()) {
@@ -338,6 +341,7 @@ public class NLPProcessorImpl implements NLPProcessor {
         allRemoves.addAll(triggerAdd);
         allRemoves.addAll(triggerDelete);
         allRemoves.addAll(triggerQuery);
+        allRemoves.addAll(triggerModify);
         allRemoves.addAll(fillers);
         allRemoves.add("钟"); // o'clock
         for (String w : allRemoves) title = title.replace(w, " ");

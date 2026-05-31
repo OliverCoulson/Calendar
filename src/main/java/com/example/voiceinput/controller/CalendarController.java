@@ -103,8 +103,65 @@ public class CalendarController {
     public ResponseEntity<Map<String, Object>> voiceExecute(
             @RequestHeader(value = "X-Token", defaultValue = "") String token,
             @RequestBody VoiceRequest request) {
-        // TODO: 实现语音→日历操作的完整流程
-        return ResponseEntity.ok(Map.of("success", false, "message", "语音执行功能开发中"));
+        User me = auth(token);
+        if (me == null) return ResponseEntity.ok(Map.of("success", false, "message", "未登录"));
+
+        String text = request.getText();
+        if (text == null || text.isBlank())
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "文本为空"));
+
+        String cleaned = text.trim().replaceAll("[。，！？、；：\\s]", "");
+        if (cleaned.length() <= 2 || cleaned.matches("^[嗯啊哦呢吧嘛呀嘿哈呵哟呗啦哇哎唉呃喔呐咚滴]+$"))
+            return ResponseEntity.ok(Map.of("success", false, "message", "未识别到有效内容"));
+
+        eventDAO.setCurrentUser(me.getId());
+
+        // NLP 解析：LLM → rule 回退
+        ParsedResult result = llmProcessor.parse(text);
+        String engine = "llm";
+        if (!llmProcessor.isEnabled() || result.getIntent() == IntentType.UNKNOWN) {
+            result = ruleProcessor.parse(text);
+            engine = "rule";
+        }
+
+        if (result.getIntent() == IntentType.UNKNOWN) {
+            return ResponseEntity.ok(Map.of(
+                "success", false, "message", "未能识别意图",
+                "engine", engine
+            ));
+        }
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("success", true);
+        resp.put("intent", result.getIntent().name());
+        resp.put("engine", engine);
+        System.out.println("[语音执行] \"" + text + "\" → " + engine + " → " + result.getIntent());
+
+        switch (result.getIntent()) {
+            case ADD -> {
+                Map<String, Object> addResult = executeAdd(result);
+                resp.putAll(addResult);
+            }
+            case DELETE -> {
+                Map<String, Object> delResult = executeDelete(result);
+                resp.putAll(delResult);
+            }
+            case QUERY -> {
+                List<CalendarEvent> events = executeQuery(result);
+                resp.put("message", events.isEmpty() ? "暂无事件" : "找到 " + events.size() + " 个事件");
+                resp.put("events", events);
+            }
+            case MODIFY -> {
+                Map<String, Object> modResult = executeModify(result);
+                resp.putAll(modResult);
+            }
+            default -> {
+                resp.put("success", false);
+                resp.put("message", "不支持的意图");
+            }
+        }
+
+        return ResponseEntity.ok(resp);
     }
 
     // ==================== TODO: 添加事件 ====================
@@ -237,5 +294,175 @@ public class CalendarController {
         resp.put("title", result.getEntities().getOrDefault("title", null));
         resp.put("location", result.getEntities().getOrDefault("location", null));
         resp.put("period", result.getEntities().getOrDefault("period", null));
+    }
+
+    // ==================== 语音执行：ADD / DELETE / QUERY ====================
+
+    /** 执行 ADD 意图：构建事件、去重、冲突检测、写入 */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> executeAdd(ParsedResult result) {
+        Map<String, Object> entities = result.getEntities();
+        String title = (String) entities.get("title");
+        LocalDateTime[] timeRange = (LocalDateTime[]) entities.get("timeRange");
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        if (title == null || title.isBlank() || timeRange == null || timeRange[0] == null) {
+            resp.put("success", false);
+            resp.put("message", "未能识别事件标题或时间");
+            return resp;
+        }
+
+        LocalDateTime start = timeRange[0];
+        LocalDateTime end = timeRange.length > 1 ? timeRange[1] : null;
+
+        // 去重：同日期同标题不重复添加
+        List<CalendarEvent> existing = calendarService.queryByTimeAndTitle(start, title);
+        boolean isDuplicate = existing.stream().anyMatch(e -> e.getTitle().equals(title));
+        if (isDuplicate) {
+            resp.put("success", false);
+            resp.put("message", "该事件已存在，请勿重复添加");
+            return resp;
+        }
+
+        // 冲突检测：查询同时间段已有事件
+        LocalDateTime checkEnd = end != null ? end : start.plusHours(1);
+        List<CalendarEvent> conflicts = calendarService.queryByTimeRange(start, checkEnd);
+        if (!conflicts.isEmpty()) {
+            resp.put("success", false);
+            resp.put("message", "该时间段已有 " + conflicts.size() + " 个事件，请确认");
+            resp.put("conflicts", conflicts);
+            return resp;
+        }
+
+        // 创建并保存事件
+        CalendarEvent event = new CalendarEvent(title, start, end);
+        String location = (String) entities.get("location");
+        if (location != null && !location.isBlank()) event.setLocation(location);
+        event.setDescription((String) entities.get("description"));
+
+        calendarService.addEvent(event);
+        resp.put("success", true);
+        resp.put("message", "已添加: " + title);
+        resp.put("event", event);
+        return resp;
+    }
+
+    /** 执行 DELETE 意图：搜索候选 → 单删 / 多候选返回 */
+    private Map<String, Object> executeDelete(ParsedResult result) {
+        Map<String, Object> entities = result.getEntities();
+        String keyword = (String) entities.get("title");
+        LocalDateTime[] timeRange = (LocalDateTime[]) entities.get("timeRange");
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        List<CalendarEvent> candidates;
+
+        if (keyword != null && timeRange != null) {
+            candidates = calendarService.queryByTimeAndTitle(timeRange[0], keyword);
+        } else if (keyword != null) {
+            candidates = calendarService.queryByKeyword(keyword);
+        } else if (timeRange != null) {
+            LocalDateTime end = timeRange.length > 1 && timeRange[1] != null ? timeRange[1] : timeRange[0].plusDays(1);
+            candidates = calendarService.queryByTimeRange(timeRange[0], end);
+        } else {
+            resp.put("success", false);
+            resp.put("message", "未能识别删除条件");
+            return resp;
+        }
+
+        if (candidates.isEmpty()) {
+            resp.put("success", false);
+            resp.put("message", "未找到匹配的事件");
+            return resp;
+        }
+
+        if (candidates.size() == 1) {
+            CalendarEvent evt = candidates.get(0);
+            calendarService.deleteEvent(evt.getId());
+            resp.put("success", true);
+            resp.put("message", "已删除: " + evt.getTitle());
+            return resp;
+        }
+
+        // 多候选，返回列表让用户选择
+        resp.put("success", true);
+        resp.put("message", "找到多个匹配事件，请选择");
+        resp.put("candidates", candidates);
+        return resp;
+    }
+
+    /** 执行 QUERY 意图：按时间/关键词/全部查询 */
+    private List<CalendarEvent> executeQuery(ParsedResult result) {
+        Map<String, Object> entities = result.getEntities();
+        String keyword = (String) entities.get("title");
+        LocalDateTime[] timeRange = (LocalDateTime[]) entities.get("timeRange");
+
+        if (timeRange != null) {
+            LocalDateTime end = timeRange.length > 1 && timeRange[1] != null ? timeRange[1] : timeRange[0].plusDays(1);
+            return calendarService.queryByTimeRange(timeRange[0], end);
+        }
+        if (keyword != null && !keyword.isBlank()) {
+            return calendarService.queryByKeyword(keyword);
+        }
+        return calendarService.getAllEvents();
+    }
+
+    /** 执行 MODIFY 意图：搜索候选 → 单改 / 多候选返回 */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> executeModify(ParsedResult result) {
+        Map<String, Object> entities = result.getEntities();
+        String keyword = (String) entities.get("title");
+        LocalDateTime[] timeRange = (LocalDateTime[]) entities.get("timeRange");
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        List<CalendarEvent> candidates;
+
+        if (keyword != null && timeRange != null) {
+            candidates = calendarService.queryByTimeAndTitle(timeRange[0], keyword);
+        } else if (keyword != null) {
+            candidates = calendarService.queryByKeyword(keyword);
+        } else {
+            resp.put("success", false);
+            resp.put("message", "未能识别要修改的事件");
+            return resp;
+        }
+
+        if (candidates.isEmpty()) {
+            resp.put("success", false);
+            resp.put("message", "未找到匹配的事件");
+            return resp;
+        }
+
+        if (candidates.size() == 1) {
+            CalendarEvent evt = candidates.get(0);
+            // 更新字段
+            String newTitle = (String) entities.get("newTitle");
+            if (newTitle != null && !newTitle.isBlank()) evt.setTitle(newTitle);
+            String nst = (String) entities.get("newStartTime");
+            if (nst != null) {
+                try {
+                    evt.setStartTime(LocalDateTime.parse(nst, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+                    evt.setRemindTime(evt.getStartTime().minusMinutes(10));
+                } catch (Exception ignored) {}
+            }
+            String net = (String) entities.get("newEndTime");
+            if (net != null) {
+                try { evt.setEndTime(LocalDateTime.parse(net, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))); }
+                catch (Exception ignored) {}
+            }
+            String nl = (String) entities.get("newLocation");
+            if (nl != null && !nl.isBlank()) evt.setLocation(nl);
+
+            calendarService.updateEvent(evt);
+            resp.put("success", true);
+            resp.put("message", "已修改: " + evt.getTitle());
+            resp.put("event", evt);
+            return resp;
+        }
+
+        // 多候选返回列表
+        resp.put("success", true);
+        resp.put("message", "找到多个匹配事件，请选择要修改的");
+        resp.put("candidates", candidates);
+        return resp;
     }
 }

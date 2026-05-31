@@ -70,6 +70,16 @@ public class NlpConfigDAO {
             {"显示","trigger_query","QUERY"},{"查一下","trigger_query","QUERY"},
             {"帮我查","trigger_query","QUERY"},{"帮我看看","trigger_query","QUERY"}
         };
+        // trigger_modify
+        String[][] triggerModify = {
+            {"修改","trigger_modify","MODIFY"},{"改","trigger_modify","MODIFY"},
+            {"变更","trigger_modify","MODIFY"},{"更改","trigger_modify","MODIFY"},
+            {"改一下","trigger_modify","MODIFY"},{"修改一下","trigger_modify","MODIFY"},
+            {"改期","trigger_modify","MODIFY"},{"改时间","trigger_modify","MODIFY"},
+            {"帮我改","trigger_modify","MODIFY"},{"帮我修改","trigger_modify","MODIFY"},
+            {"重新安排","trigger_modify","MODIFY"},{"推迟","trigger_modify","MODIFY"},
+            {"提前","trigger_modify","MODIFY"},{"延后","trigger_modify","MODIFY"}
+        };
         // stop_words
         String[][] stops = {
             {"帮我","stop_word",""},{"今天","stop_word",""},{"明天","stop_word",""},
@@ -110,7 +120,7 @@ public class NlpConfigDAO {
         String insertSql = "INSERT INTO nlp_config (word, category, intent) VALUES ";
         StringBuilder sb = new StringBuilder(insertSql);
         boolean first = true;
-        for (String[][] group : new String[][][]{triggerAdd, triggerDelete, triggerQuery, stops, fillers}) {
+        for (String[][] group : new String[][][]{triggerAdd, triggerDelete, triggerModify, triggerQuery, stops, fillers}) {
             for (String[] row : group) {
                 if (!first) sb.append(", ");
                 first = false;

@@ -58,6 +58,21 @@ public class LLMNLPProcessor implements NLPProcessor {
                 String d = str(p, "date");
                 if (d != null) entities.put("timeRange", dayRange(d));
             }
+            case "modify_event" -> {
+                intent = IntentType.MODIFY;
+                String kw = str(p, "keyword");
+                String date = str(p, "date");
+                if (kw != null) entities.put("title", kw);
+                if (date != null) entities.put("timeRange", dayRange(date));
+                String nt = str(p, "newTitle");
+                if (nt != null) entities.put("newTitle", nt);
+                String nst = str(p, "newStartTime");
+                if (nst != null) entities.put("newStartTime", nst);
+                String net = str(p, "newEndTime");
+                if (net != null) entities.put("newEndTime", net);
+                String nl = str(p, "newLocation");
+                if (nl != null) entities.put("newLocation", nl);
+            }
             default -> intent = IntentType.UNKNOWN;
         }
 

@@ -72,6 +72,25 @@ public class AIService {
                 "required": []
               }
             }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "modify_event",
+              "description": "修改日历事件，例如改时间、改标题、改地点",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "keyword": {"type": "string", "description": "要修改的原事件关键词或标题"},
+                  "date": {"type": "string", "description": "原事件日期 yyyy-MM-dd，无则为null"},
+                  "newTitle": {"type": "string", "description": "新标题，不改则为null"},
+                  "newStartTime": {"type": "string", "description": "新开始时间 yyyy-MM-dd HH:mm，不改则为null"},
+                  "newEndTime": {"type": "string", "description": "新结束时间，不改则为null"},
+                  "newLocation": {"type": "string", "description": "新地点，不改则为null"}
+                },
+                "required": ["keyword"]
+              }
+            }
           }
         ]
         """;

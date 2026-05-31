@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class CalendarServiceImpl implements CalendarService {
@@ -27,8 +28,14 @@ public class CalendarServiceImpl implements CalendarService {
      */
     @Override
     public boolean addEvent(CalendarEvent event) {
-        // TODO: 实现添加事件
-        return false;
+        if (event.getId() == null) {
+            event.setId(UUID.randomUUID().toString());
+        }
+        if (event.getRemindTime() == null && event.getStartTime() != null) {
+            event.setRemindTime(event.getStartTime().minusMinutes(10));
+        }
+        eventDAO.insert(event);
+        return true;
     }
 
     // ==================== TODO: 删除事件 ====================
@@ -39,8 +46,12 @@ public class CalendarServiceImpl implements CalendarService {
      */
     @Override
     public boolean deleteEvent(String id) {
-        // TODO: 实现删除事件
-        return false;
+        return eventDAO.deleteById(id);
+    }
+
+    @Override
+    public boolean updateEvent(CalendarEvent event) {
+        return eventDAO.update(event);
     }
 
     // ==================== 查询事件（已实现） ====================

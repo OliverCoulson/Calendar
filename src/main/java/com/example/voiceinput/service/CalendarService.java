@@ -7,6 +7,7 @@ import java.util.List;
 public interface CalendarService {
     boolean addEvent(CalendarEvent event);
     boolean deleteEvent(String id);
+    boolean updateEvent(CalendarEvent event);
     List<CalendarEvent> queryByTimeRange(LocalDateTime start, LocalDateTime end);
     List<CalendarEvent> queryByKeyword(String keyword);
     List<CalendarEvent> queryByTimeAndTitle(LocalDateTime time, String titleKeyword);
